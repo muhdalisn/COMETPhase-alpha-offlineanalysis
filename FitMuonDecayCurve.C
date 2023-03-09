@@ -16,38 +16,42 @@
 
 
 
-void DoFit(TString runRange = "1530-1880"){
+void DoFit(TString runRange = "1530-1882"){
   SetPlotStyle();
   gStyle->SetOptStat(0);
 
   // 
   // 
   //
-  TFile* inFile = new TFile("hists/merged/"+runRange+".root");
+  TFile* inFile = new TFile("/gpfs/group/had/muon/derveni/phasealpha/data/output/hists/merged/"+runRange+".root");
   TH1D*  muonDecayCurve = (TH1D*) inFile->Get("histos/RCMuonDecayAnalysisHistos/MuonDecayCurve/MuonDecayCurve");
   
   // std::cout << muonDecayCurve->GetNbinsX() << std::endl;
-  muonDecayCurve->Rebin(20);
+//  muonDecayCurve->Rebin(5);
   // std::cout << muonDecayCurve->GetNbinsX() << std::endl;
   // 
 
-  float minRange = 0.;
+  float minRange = -1;
   float maxRange = 9.;
 
-  float minFitRange = 0.;
-  float maxFitRange = 8.5;
+  float minFitRange = -1;
+  float maxFitRange = 8.7; 
 
-  int totalEntries = muonDecayCurve->Integral(0,muonDecayCurve->GetNbinsX()+1);
+  Double_t totalEntries = muonDecayCurve->Integral(0,muonDecayCurve->GetNbinsX()+1);
+  Double_t livetime;
+  if(runRange == "1530-1882"){ livetime = 958.7;}
+  else{livetime = 1; std::cout << "No livetime set, scaled to 1" << std::endl;}
+  TString my_norm = Form("%g", livetime/totalEntries);
   
   TVirtualFitter::SetMaxIterations( 10000 );
   //
   // Setup total function
   //
-  auto fTotal = new TF1("fTotal", "[0]/[1]*exp(-x/[1]) + [2]/[3]*exp(-x/[3]) + \
+  auto fTotal = new TF1("fTotal", "(0<x)*(([0]/[1])*exp(-x/[1]) + ([2]/[3])*exp(-x/[3])) + \
     gaus(4) + gaus(7) + gaus(10) + gaus(13) + gaus(16) + gaus(19) + gaus(22) + gaus(25) + \
-    gaus(28) +  gaus(31) + gaus(34) + [37]", 
-    minRange, maxRange
-  );
+    gaus(28) +  gaus(31) + gaus(34) + [37] + gaus(38)", //+ pol1(41)",  
+    minRange, maxRange);
+
   SetLineCosmetics(fTotal, kRed+1, 2, 2);
   // 
   SetParInfo(fTotal, 0, 250, 0, totalEntries, "Exp0Norm");
@@ -100,14 +104,18 @@ void DoFit(TString runRange = "1530-1880"){
   SetParInfo(fTotal, 35, 8.2, 7.5, 8.5, "Gaus10Mu");
   SetParInfo(fTotal, 36, 0.1, 0.,1., "Gaus10Sigma");
   // pol0
-  SetParInfo(fTotal, 37, 30., 0., 200., "Pol0");
-
+  SetParInfo(fTotal, 37, 30., 0, 200., "Pol0");
+  // Gaussn1
+  SetParInfo(fTotal, 38, 1000, 0., totalEntries, "Gausn1Norm");
+  SetParInfo(fTotal, 39, 0, -0.3, 0.3, "Gausn1Mu");
+  SetParInfo(fTotal, 40, 0.1, 0.,1., "Gausn1Sigma");
+//  // pol1
+//  SetParInfo(fTotal, 41, 30., -1, -0.2, "Pol1");
 
   //
   // Run the fit here
   //
-
-  muonDecayCurve->Fit(fTotal, "L", "", minFitRange, maxFitRange);
+  muonDecayCurve->Fit(fTotal, "L", "", minFitRange, maxFitRange); 
 
   auto fitPar0 = fTotal->GetParameter(0);
   auto fitPar1 = fTotal->GetParameter(1);
@@ -154,9 +162,10 @@ void DoFit(TString runRange = "1530-1880"){
   //
   pad1->cd();
 
-  muonDecayCurve->SetMinimum(10);
+  muonDecayCurve->SetMinimum(0.5);
   muonDecayCurve->Draw("HIST");
-  fTotal->Draw("SAME");
+  fTotal->SetNpx(500);
+  fTotal->Draw("SAME C");
   // fExp0->Draw("SAME");
   // fExp1->Draw("SAME");
   // fGaus0->Draw("SAME");
@@ -169,7 +178,6 @@ void DoFit(TString runRange = "1530-1880"){
   muonDecayCurve->SetStats(0);
 
   pad1->SetLogy();
-
   //
   //
   //
@@ -189,7 +197,7 @@ void DoFit(TString runRange = "1530-1880"){
 void FitMuonDecayCurve(){
   // DoFit("1436-1464");
   // DoFit("1465-1524");
-  DoFit("1530-1880");
+  DoFit("1530-1882");
 }
 
 int main(){
